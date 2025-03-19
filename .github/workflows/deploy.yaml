@@ -1,10 +1,5 @@
 name: Deploy
 on:
-  push:
-    branches:
-      - 'main'
-    paths:
-      - 'deploy.md'
   workflow_dispatch:
 
 jobs:
@@ -13,12 +8,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@main
+      
       - name: Setup Working Directory for OCP Install
         run: |
-          perl -pi -e 's/RED_HAT_PULLSECRET/${{ secrets.RED_HAT_PULLSECRET }}/' install-config.yaml
-          perl -pi -e 's/OCP_BASE_DOMAIN/${{ secrets.OCP_BASE_DOMAIN }}/' install-config.yaml
-          perl -pi -e 's/OCP_CLUSTER_NAME/${{ secrets.OCP_CLUSTER_NAME }}/' install-config.yaml
-          perl -pi -e 's/AWS_REGION/${{ secrets.AWS_REGION }}/' install-config.yaml
+          sed -i "s/RED_HAT_PULLSECRET/${{ secrets.RED_HAT_PULLSECRET }}/g" install-config.yaml
+          sed -i "s/OCP_BASE_DOMAIN/${{ secrets.OCP_BASE_DOMAIN }}/g" install-config.yaml
+          sed -i "s/OCP_CLUSTER_NAME/${{ secrets.OCP_CLUSTER_NAME }}/g" install-config.yaml
+          sed -i "s/AWS_REGION/${{ secrets.AWS_REGION }}/g" install-config.yaml
           mkdir ocp-artifact
           cp install-config.yaml ocp-artifact/
 
@@ -27,14 +23,7 @@ jobs:
         with:
           openshift-install: "${{secrets.OCP_CLIENT_VERSION}}"
           oc: "${{secrets.OCP_CLIENT_VERSION}}"
-          
-      - name: Get openshift-install flags
-        run: openshift-install create --help
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
-
+      
       - name: Create OpenShift Cluster
         run: openshift-install create cluster --dir=ocp-artifact/
         env:
@@ -53,28 +42,8 @@ jobs:
           export KUBECONFIG=ocp-artifact/auth/kubeconfig
           echo "Creating htpasswd file"
           htpasswd -c -b -B htpasswd ${{ secrets.OCP_ADMIN_USER }} ${{ secrets.OCP_ADMIN_PASS }}
-          htpasswd -b -B htpasswd ${{ secrets.OCP_DEV_USER }} ${{ secrets.OCP_DEV_PASS }}
-          oc create secret generic htpass-secret --from-file=htpasswd=htpasswd -n openshift-config --dry-run -o yaml | oc apply -f -
+          oc create secret generic htpass-secret --from-file=htpasswd=htpasswd -n openshift-config --dry-run=client -o yaml | oc apply -f -
           oc apply -f cluster-oauth.yaml
           sleep 300
           oc adm policy add-cluster-role-to-user cluster-admin ${{ secrets.OCP_ADMIN_USER }}
           oc adm policy add-cluster-role-to-user cluster-admin -z openshift-gitops-argocd-application-controller
-          
-      - name: Get Infra ID
-        run: |
-          export infraID=`cat ocp-artifact/metadata.json | jq -r .infraID`
-          export KUBECONFIG=ocp-artifact/auth/kubeconfig
-          perl -pi -e "s/{{ infraID }}/$infraID/g" infra-machineset.yaml
-          perl -pi -e 's/{{ regionID }}/${{ secrets.AWS_REGION }}/g' infra-machineset.yaml
-          perl -pi -e "s/{{ infraID }}/$infraID/g" infra-machineautoscaler.yaml
-          perl -pi -e 's/{{ regionID }}/${{ secrets.AWS_REGION }}/g' infra-machineautoscaler.yaml
-          perl -pi -e "s/{{ infraID }}/$infraID/g" worker-machineautoscaler.yaml
-          perl -pi -e 's/{{ regionID }}/${{ secrets.AWS_REGION }}/g' worker-machineautoscaler.yaml
-          perl -pi -e "s/{{ infraID }}/$infraID/g" control-machineset.yaml
-          perl -pi -e 's/{{ regionID }}/${{ secrets.AWS_REGION }}/g' control-machineset.yaml
-          oc create -f infra-machineset.yaml -n openshift-machine-api
-          oc create -f control-machineset.yaml -n openshift-machine-api
-          oc create -f infra-machineautoscaler.yaml -n openshift-machine-api
-          oc create -f worker-machineautoscaler.yaml -n openshift-machine-api 
-          oc create -f cluster-autoscaler.yaml
-      
