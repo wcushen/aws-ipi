@@ -27,4 +27,4 @@ platform:
   aws:
     region: AWS_REGION
 publish: External
-pullSecret: RED_HAT_PULLSECRET
+pullSecret: 'RED_HAT_PULLSECRET'
