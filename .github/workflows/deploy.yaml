@@ -11,10 +11,10 @@ jobs:
       
       - name: Setup Working Directory for OCP Install
         run: |
-          sed -i "s/RED_HAT_PULLSECRET/${{ secrets.RED_HAT_PULLSECRET }}/g" install-config.yaml
-          sed -i "s/OCP_BASE_DOMAIN/${{ secrets.OCP_BASE_DOMAIN }}/g" install-config.yaml
-          sed -i "s/OCP_CLUSTER_NAME/${{ secrets.OCP_CLUSTER_NAME }}/g" install-config.yaml
-          sed -i "s/AWS_REGION/${{ secrets.AWS_REGION }}/g" install-config.yaml
+          sed -i 's/RED_HAT_PULLSECRET/${{ secrets.RED_HAT_PULLSECRET }}/' install-config.yaml > /dev/null 2>&1
+          sed -i 's/OCP_BASE_DOMAIN/${{ secrets.OCP_BASE_DOMAIN }}/' install-config.yaml > /dev/null 2>&1
+          sed -i 's/OCP_CLUSTER_NAME/${{ secrets.OCP_CLUSTER_NAME }}/' install-config.yaml > /dev/null 2>&1
+          sed -i 's/AWS_REGION/${{ secrets.AWS_REGION }}/' install-config.yaml > /dev/null 2>&1
           mkdir ocp-artifact
           cp install-config.yaml ocp-artifact/
 
