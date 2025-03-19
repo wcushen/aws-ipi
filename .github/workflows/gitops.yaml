@@ -1,17 +1,10 @@
 name: GitOps-Tasks
 on:
-  workflow_run:
-    workflows:
-      - Deploy
-    types:
-      - completed
-    branches:
-      - main
   workflow_dispatch:
 
 jobs:
   Setup:
-    name: GitOps Day2 Tasks
+    name: GitOps Day-2 Tasks
     runs-on: ubuntu-latest
     steps:
       - name: Checkout r3dact3d/gitops external repo
