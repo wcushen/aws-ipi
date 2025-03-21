@@ -25,7 +25,7 @@ jobs:
           oc: "${{secrets.OCP_CLIENT_VERSION}}"
       
       - name: Create OpenShift Cluster
-        run: openshift-install create cluster --dir=ocp-artifact/
+        run: openshift-install create cluster --skip-password-print --dir=ocp-artifact/
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -44,6 +44,3 @@ jobs:
           htpasswd -c -b -B htpasswd ${{ secrets.OCP_ADMIN_USER }} ${{ secrets.OCP_ADMIN_PASS }}
           oc create secret generic htpass-secret --from-file=htpasswd=htpasswd -n openshift-config --dry-run=client -o yaml | oc apply -f -
           oc apply -f cluster-oauth.yaml
-          sleep 300
-          oc adm policy add-cluster-role-to-user cluster-admin ${{ secrets.OCP_ADMIN_USER }}
-          oc adm policy add-cluster-role-to-user cluster-admin -z openshift-gitops-argocd-application-controller
