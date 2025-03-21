@@ -7,6 +7,8 @@ jobs:
     name: ACM and GitOps
     runs-on: ubuntu-latest
     steps:      
+      - uses: actions/checkout@main
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -28,7 +30,6 @@ jobs:
           path: ocp-artifact
 
       - name: Rollout ACM/GitOps Operators  
-        uses: actions/checkout@main
         run: |
           cp ocp-artifact/auth/kubeconfig $GITHUB_WORKSPACE/kubeconfig
           export KUBECONFIG=$GITHUB_WORKSPACE/kubeconfig
