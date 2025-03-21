@@ -31,11 +31,13 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
 
-      - name: Save Artifacts for Destroy
-        uses: actions/upload-artifact@v4
-        with:
-          name: ocp-artifact
-          path: ocp-artifact
+      - name: Upload Artifacts to S3
+        run: |
+          aws s3 cp --recursive ocp-artifact/ s3://${{ secrets.AWS_S3_BUCKET }}/ocp-artifact/
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
 
       - name: Setup HTPasswd IDP
         run: |

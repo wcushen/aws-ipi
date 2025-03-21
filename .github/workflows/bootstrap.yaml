@@ -15,19 +15,20 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
-        
+
       - name: Install OpenShift CLI tools
         uses: redhat-actions/openshift-tools-installer@v1
         with:
-          openshift-install: "${{secrets.OCP_CLIENT_VERSION}}"
-          oc: "${{secrets.OCP_CLIENT_VERSION}}"
-          
-      - name: Download Artifacts from Cluster Deploy
-        uses: dawidd6/action-download-artifact@v4
-        with:
-          workflow: deploy.yaml
-          name: ocp-artifact
-          path: ocp-artifact
+          openshift-install: "${{ secrets.OCP_CLIENT_VERSION }}"
+          oc: "${{ secrets.OCP_CLIENT_VERSION }}"
+
+      - name: Download Artifacts from S3
+        run: |
+          aws s3 cp --recursive s3://${{ secrets.AWS_S3_BUCKET }}/ocp-artifact/ ocp-artifact/
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
 
       - name: Rollout ACM/GitOps Operators  
         run: |
@@ -36,19 +37,18 @@ jobs:
 
           oc apply -k gitops || true  # Apply Operators but don't fail immediately
           echo "Waiting for Operators to be ready..."
-          sleep 60  # Initial delay before checking status
 
-          # Wait for all operators to be available
-          for i in {1..10}; do
+          # Wait for operators to become available (max 10 minutes)
+          for i in {1..20}; do
             NOT_READY=$(oc get csv -n openshift-operators --no-headers | grep -v "Succeeded" || true)
             if [[ -z "$NOT_READY" ]]; then
-              echo "All Operators are ready."
+              echo "✅ All Operators are ready."
               break
             fi
-            echo "Operators are still installing..."
+            echo "⏳ Operators are still installing... Retrying in 30s ($i/20)"
             sleep 30
           done
 
-      - name: Re-Run to deploy Operands
+      - name: Deploy ACM/GitOps Operands
         run: |
-          oc apply -k gitops  # Apply kustomize manifests
+          oc apply -k gitops

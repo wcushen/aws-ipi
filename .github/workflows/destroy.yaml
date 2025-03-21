@@ -3,20 +3,19 @@ on:
   workflow_dispatch:
 
 jobs:
-  Setup:
-    name: Setup OpenShift Installer Binary
+  Destroy:
+    name: Destroy OpenShift Cluster
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Download OCP Cluster Artifacts
-        uses: dawidd6/action-download-artifact@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          workflow: deploy.yaml
-          branch: main
-          name: ocp-artifact
-          path: .
-          check_artifacts:  false
+
+      - name: Download OCP Cluster Artifacts from S3
+        run: |
+          aws s3 cp --recursive s3://${{ secrets.AWS_S3_BUCKET }}/ocp-artifact/ ocp-artifact/
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
 
       - name: Install OpenShift CLI tools
         uses: redhat-actions/openshift-tools-installer@v1
@@ -24,7 +23,7 @@ jobs:
           openshift-install: "${{ secrets.OCP_CLIENT_VERSION }}"
 
       - name: Destroy OpenShift Cluster
-        run: openshift-install destroy cluster --dir=.
+        run: openshift-install destroy cluster --dir=ocp-artifact/
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
