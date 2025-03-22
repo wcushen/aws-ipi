@@ -25,6 +25,7 @@ networking:
   - 172.30.0.0/16
 platform:
   aws:
+    type: 
     region: AWS_REGION
 publish: External
 pullSecret: 'RED_HAT_PULLSECRET'

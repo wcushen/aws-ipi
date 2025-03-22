@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: init-scripts
+data:
+  init-vault.sh: |
+    set -x -e
+
+    timeout 300 sh -c 'until vault status; do sleep 5; done'
+
+    # login into vault to retrieve token
+    vault login ${VAULT_TOKEN}
+
+    # enable kubernetes auth method under specific path:
+    vault auth enable -path="/${CLUSTER_IDENTIFIER}" kubernetes
+
+    # write configuration to use your cluster
+    vault write auth/${CLUSTER_IDENTIFIER}/config \
+      token_reviewer_jwt=@${SERVICE_ACCOUNT_TOKEN_PATH}/token \
+      kubernetes_host="${K8S_HOST}" \
+      kubernetes_ca_cert=@${SERVICE_ACCOUNT_TOKEN_PATH}/ca.crt
+
+    # create policy to use keys related to the cluster
+    vault policy write "${CLUSTER_IDENTIFIER}" - << EOS
+    path "secret/data/ceph-csi/*" {
+      capabilities = ["create", "update", "delete", "read", "list"]
+    }
+
+    path "secret/metadata/ceph-csi/*" {
+      capabilities = ["read", "delete", "list"]
+    }
+
+    path "sys/mounts" {
+      capabilities = ["read"]
+    }
+    EOS
+
+    # create a role
+    vault write "auth/${CLUSTER_IDENTIFIER}/role/${PLUGIN_ROLE}" \
+        bound_service_account_names="${SERVICE_ACCOUNTS}" \
+        bound_service_account_namespaces="${SERVICE_ACCOUNTS_NAMESPACE}" \
+        kubernetes_ca_cert=@${SERVICE_ACCOUNT_TOKEN_PATH}/ca.crt \
+        policies="${CLUSTER_IDENTIFIER}"
+
+    # disable iss validation
+    vault write auth/kubernetes/config \
+      kubernetes_host="${K8S_HOST}" \
+      kubernetes_ca_cert=@${SERVICE_ACCOUNT_TOKEN_PATH}/ca.crt \
+      disable_iss_validation=true

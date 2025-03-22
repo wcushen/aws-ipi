@@ -1,4 +1,7 @@
 ---
+resources:
+- 
+
 helmCharts:
   - name: vault
     namespace: vault

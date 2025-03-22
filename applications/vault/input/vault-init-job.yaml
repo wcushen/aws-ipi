@@ -1,0 +1,46 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vault-init-job
+spec:
+  parallelism: 1
+  completions: 1
+  template:
+    metadata:
+      name: vault-init-job
+    spec:
+      serviceAccount: rbd-csi-vault-token-review
+      volumes:
+        - name: init-scripts-volume
+          configMap:
+            name: init-scripts
+      containers:
+        - name: vault-init-job
+          image: docker.io/library/vault:latest
+          volumeMounts:
+            - mountPath: /init-scripts
+              name: init-scripts-volume
+          env:
+            - name: HOME
+              value: /tmp
+            - name: CLUSTER_IDENTIFIER
+              value: kubernetes
+            - name: SERVICE_ACCOUNT_TOKEN_PATH
+              value: /var/run/secrets/kubernetes.io/serviceaccount
+            - name: K8S_HOST
+              value: https://{your_openshift_APIServer_external_endpoint}
+            - name: PLUGIN_ROLE
+              value: csi-kubernetes
+            - name: SERVICE_ACCOUNTS
+              value: rbd-csi-nodeplugin,rbd-csi-provisioner,csi-rbdplugin,csi-rbdplugin-provisioner,rook-csi-rbd-provisioner-sa,rook-csi-rbd-plugin-sa
+            - name: SERVICE_ACCOUNTS_NAMESPACE
+              value: openshift-storage
+            - name: VAULT_ADDR
+              value: {your_vault_url}
+            - name: VAULT_DEV_ROOT_TOKEN_ID
+              value: sample_root_token
+          command:
+            - /bin/sh
+            - /init-scripts/init-vault.sh
+          imagePullPolicy: "IfNotPresent"
+      restartPolicy: Never
