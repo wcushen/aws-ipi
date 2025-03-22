@@ -34,7 +34,7 @@ jobs:
     steps:
       - name: Create S3 Bucket
         run: |
-          BUCKET_NAME="OCPDEPLOY-$(date +%Y-%m-%d-%H-%M-%S)"
+          BUCKET_NAME="ocpdeploy-$(date +%Y-%m-%d-%H-%M-%S)"
           aws s3 mb s3://$BUCKET_NAME
           echo "Created S3 bucket: $BUCKET_NAME"
         env:
