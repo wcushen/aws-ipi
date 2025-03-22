@@ -46,6 +46,9 @@ jobs:
     name: Create OpenShift Cluster
     runs-on: ubuntu-latest
     needs: create_s3_bucket  # Ensures this job runs after create_s3_bucket
+    with:
+      openshift-install: "${{secrets.OCP_CLIENT_VERSION}}"
+      oc: "${{secrets.OCP_CLIENT_VERSION}}"
     steps:
       - name: Create OpenShift Cluster
         run: openshift-install create cluster --skip-password-print --dir=ocp-artifact/
