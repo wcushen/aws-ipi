@@ -2,12 +2,12 @@
 apiVersion: policy.open-cluster-management.io/v1
 kind: PolicyGenerator
 metadata:
-  name: storage-mce
+  name: odf
 placementBindingDefaults:
-  name: storage-mce
+  name: odf
 policyDefaults:
   placement:
-    placementName: placement-mce
+    placementName: placement-hub
   categories:
     - CM Configuration Management
   complianceType: "musthave"
@@ -24,6 +24,6 @@ policyDefaults:
     - NIST SP 800-53
   policyAnnotations: {"argocd.argoproj.io/compare-options": "IgnoreExtraneous"}
 policies:
-  - name: storage-mce
+  - name: odf
     manifests:
       - path: input/

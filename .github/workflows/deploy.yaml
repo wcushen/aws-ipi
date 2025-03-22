@@ -48,6 +48,8 @@ jobs:
           htpasswd -c -b -B htpasswd ${{ secrets.OCP_ADMIN_USER }} ${{ secrets.OCP_ADMIN_PASS }}
           oc create secret generic htpass-secret --from-file=htpasswd=htpasswd -n openshift-config --dry-run=client -o yaml | oc apply -f -
           oc apply -f auth/cluster-oauth.yaml
+          sleep 200
+          oc adm policy add-cluster-role-to-user cluster-admin ${{ secrets.OCP_ADMIN_USER }}
 
       - name: Upload Artifacts to S3
         run: |
