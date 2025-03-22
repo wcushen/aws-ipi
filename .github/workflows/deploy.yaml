@@ -4,7 +4,7 @@ on:
 
 jobs:
   Setup:
-    name: Setup OpenShift Installer Binary
+    name: Deploy OpenShift Cluster
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@main
@@ -45,4 +45,4 @@ jobs:
           echo "Creating htpasswd file"
           htpasswd -c -b -B htpasswd ${{ secrets.OCP_ADMIN_USER }} ${{ secrets.OCP_ADMIN_PASS }}
           oc create secret generic htpass-secret --from-file=htpasswd=htpasswd -n openshift-config --dry-run=client -o yaml | oc apply -f -
-          oc apply -f cluster-oauth.yaml
+          oc apply -f auth/cluster-oauth.yaml
