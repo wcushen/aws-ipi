@@ -48,16 +48,18 @@ jobs:
             sleep 30
           done
 
+          echo "🔍 Checking OpenShift CLI version..."
+          oc version --client
+          
           while true; do
             echo "Reapplying GitOps resources..."
-            APPLY_OUTPUT=$(oc apply -k gitops --kubeconfig=$GITHUB_WORKSPACE/kubeconfig 2>&1)
-            echo "$APPLY_OUTPUT"
+            APPLY_OUTPUT=$(oc apply -k gitops --kubeconfig=$GITHUB_WORKSPACE/kubeconfig 2>&1 | tee /dev/stdout)
 
-            if ! echo "$APPLY_OUTPUT" | grep -q "not found"; then
+            if echo "$APPLY_OUTPUT" | grep -q "not found"; then
+              echo "❌ Found missing resources, retrying in 30s..."
+              sleep 30
+            else
               echo "✅ All resources applied successfully."
               break
             fi
-
-            echo "❌ Found missing resources, retrying in 30s..."
-            sleep 30
           done
