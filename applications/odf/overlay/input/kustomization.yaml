@@ -1,0 +1,7 @@
+---
+resources:
+  - ../../base
+ # - local-volume-discovery.yaml
+ # - local-volume-discovery.yaml
+ # - local-volume-set.yaml
+ # - storage-cluster.yaml
