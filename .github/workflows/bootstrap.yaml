@@ -51,4 +51,5 @@ jobs:
 
       - name: Deploy ACM/GitOps Operands
         run: |
+          export KUBECONFIG=$GITHUB_WORKSPACE/kubeconfig
           oc apply -k gitops
