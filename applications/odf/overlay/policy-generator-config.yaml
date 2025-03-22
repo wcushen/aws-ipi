@@ -7,7 +7,7 @@ placementBindingDefaults:
   name: odf
 policyDefaults:
   placement:
-    placementName: placement-hub
+    placementName: placement-hub-openshift
   categories:
     - CM Configuration Management
   complianceType: "musthave"
