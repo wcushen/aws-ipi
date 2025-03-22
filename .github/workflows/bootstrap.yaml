@@ -48,9 +48,6 @@ jobs:
             sleep 30
           done
 
-          echo "🔍 Checking OpenShift CLI version..."
-          oc version --client
-          
           while true; do
             echo "Reapplying GitOps resources..."
             APPLY_OUTPUT=$(oc apply -k gitops --kubeconfig=$GITHUB_WORKSPACE/kubeconfig 2>&1 | tee /dev/stdout)
