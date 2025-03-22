@@ -17,7 +17,13 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
 
-      - name: Setup HTPasswd IDP
+     - name: Install OpenShift CLI tools
+        uses: redhat-actions/openshift-tools-installer@v1
+        with:
+          openshift-install: "${{ secrets.OCP_CLIENT_VERSION }}"
+          oc: "${{ secrets.OCP_CLIENT_VERSION }}"
+
+      - name: Install App of Apps
         run: |
           export KUBECONFIG=ocp-artifact/auth/kubeconfig
           oc apply -f app-of-apps/
