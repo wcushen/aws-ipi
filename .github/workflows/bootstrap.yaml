@@ -30,25 +30,46 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
 
-      - name: Rollout ACM/GitOps Operators  
+      - name: Rollout ACM/GitOps Operators and Operands
         run: |
           cp ocp-artifact/auth/kubeconfig $GITHUB_WORKSPACE/kubeconfig
           export KUBECONFIG=$GITHUB_WORKSPACE/kubeconfig
 
-          oc apply -k gitops || true  # Apply Operators but don't fail immediately
-          echo "Waiting for Operators to be ready..."
+          oc apply -k gitops --kubeconfig=$GITHUB_WORKSPACE/kubeconfig || true
 
-          # Wait for operators to become available (max 10 minutes)
-          for i in {1..20}; do
-            NOT_READY=$(oc get csv -n openshift-operators --no-headers | grep -v "Succeeded" || true)
-            if [[ -z "$NOT_READY" ]]; then
-              echo "✅ All Operators are ready."
-              break
-            fi
-            echo "⏳ Operators are still installing... Retrying in 30s ($i/20)"
+          echo "Waiting for ACM and GitOps Operators to be fully installed..."
+          while ! oc get csv -n open-cluster-management | grep -q "Succeeded"; do
+            echo "Still waiting for ACM CSV to be ready..."
             sleep 30
           done
 
-      - name: Deploy ACM/GitOps Operands
-        run: |
-          oc apply -k gitops --kubeconfig=$GITHUB_WORKSPACE/kubeconfig
+          while ! oc get csv -n openshift-operators | grep -q "Succeeded"; do
+            echo "Still waiting for GitOps CSV to be ready..."
+            sleep 30
+          done
+
+          echo "Waiting for CRDs to be available..."
+          for crd in gitopsclusters.apps.open-cluster-management.io \
+                     placements.cluster.open-cluster-management.io \
+                     managedclustersets.cluster.open-cluster-management.io \
+                     managedclustersetbindings.cluster.open-cluster-management.io \
+                     multiclusterhubs.operator.open-cluster-management.io; do
+            while ! oc get crd $crd &>/dev/null; do
+              echo "Waiting for CRD: $crd..."
+              sleep 10
+            done
+          done
+
+          while true; do
+            echo "Reapplying GitOps resources..."
+            APPLY_OUTPUT=$(oc apply -k gitops --kubeconfig=$GITHUB_WORKSPACE/kubeconfig 2>&1)
+            echo "$APPLY_OUTPUT"
+
+            if ! echo "$APPLY_OUTPUT" | grep -q "not found"; then
+              echo "✅ All resources applied successfully."
+              break
+            fi
+
+            echo "❌ Found missing resources, retrying in 30s..."
+            sleep 30
+          done
