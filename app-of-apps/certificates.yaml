@@ -2,7 +2,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: odf
+  name: certificates
   namespace: openshift-gitops
 spec:
   destination:
@@ -11,7 +11,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/wcushen/aws-ipi.git
-    path: applications/odf/overlay
+    path: applications/certificates
     targetRevision: main
   syncPolicy:
     automated:
