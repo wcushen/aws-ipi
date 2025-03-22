@@ -20,6 +20,7 @@ jobs:
   install_openshift_cli:
     name: Install OpenShift CLI tools
     runs-on: ubuntu-latest
+    needs: setup_working_directory  # Ensures this job runs after setup_working_directory
     steps:
       - uses: redhat-actions/openshift-tools-installer@v1
         with:
@@ -29,6 +30,7 @@ jobs:
   create_s3_bucket:
     name: Create S3 Bucket for OCP Artifacts
     runs-on: ubuntu-latest
+    needs: install_openshift_cli  # Ensures this job runs after install_openshift_cli
     steps:
       - name: Create S3 Bucket
         run: |
@@ -43,6 +45,7 @@ jobs:
   create_openshift_cluster:
     name: Create OpenShift Cluster
     runs-on: ubuntu-latest
+    needs: create_s3_bucket  # Ensures this job runs after create_s3_bucket
     steps:
       - name: Create OpenShift Cluster
         run: openshift-install create cluster --skip-password-print --dir=ocp-artifact/
@@ -54,6 +57,7 @@ jobs:
   upload_artifacts_to_s3:
     name: Upload Artifacts to S3
     runs-on: ubuntu-latest
+    needs: create_openshift_cluster  # Ensures this job runs after create_openshift_cluster
     steps:
       - name: Upload Artifacts to S3
         run: |
@@ -66,6 +70,7 @@ jobs:
   setup_htpasswd_idp:
     name: Setup HTPasswd IDP
     runs-on: ubuntu-latest
+    needs: upload_artifacts_to_s3  # Ensures this job runs after upload_artifacts_to_s3
     steps:
       - name: Setup HTPasswd IDP
         run: |
