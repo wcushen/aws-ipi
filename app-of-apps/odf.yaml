@@ -1,21 +1,39 @@
 ---
 apiVersion: argoproj.io/v1alpha1
-kind: Application
+kind: ApplicationSet
 metadata:
   name: odf
   namespace: openshift-gitops
 spec:
-  destination:
-    namespace: openshift-gitops
-    server: 'https://kubernetes.default.svc'
-  project: default
-  source:
-    repoURL: https://github.com/wcushen/aws-ipi.git
-    path: applications/odf/overlay
-    targetRevision: main
+  goTemplate: true
+  generators:
+    - clusterDecisionResource:
+        configMapRef: acm-placement
+        labelSelector:
+          matchLabels:
+            cluster.open-cluster-management.io/placement: placement-hub-openshift
+        requeueAfterSeconds: 180
   syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - Validate=true
+    preserveResourcesOnDeletion: false
+  template:
+    metadata:
+      name: odf-{{.name}}
+      annotations:
+        argocd.argoproj.io/compare-options: IgnoreExtraneous
+    spec:
+      project: default
+      destination:
+        server: "{{.server}}"
+        namespace: vault
+      source:
+        repoURL: https://github.com/wcushen/aws-ipi.git
+        path: applications/odf/overlay
+        plugin:
+          name: argocd-novault-plugin-kustomize
+        targetRevision: main
+      syncPolicy:
+        automated:
+          prune: false
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
