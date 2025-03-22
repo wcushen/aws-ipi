@@ -1,0 +1,23 @@
+name: Deploy App of Apps
+on:
+  workflow_dispatch:
+
+jobs:
+  Destroy:
+    name: Deploy App of Apps
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Download OCP Cluster Artifacts from S3
+        run: |
+          aws s3 cp --recursive s3://${{ secrets.AWS_S3_BUCKET }}/ocp-artifact/ ocp-artifact/
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+
+      - name: Setup HTPasswd IDP
+        run: |
+          export KUBECONFIG=ocp-artifact/auth/kubeconfig
+          oc apply -f app-of-apps/
