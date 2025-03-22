@@ -49,12 +49,6 @@ jobs:
             sleep 30
           done
 
-          ## Trying again 
-          oc apply -k gitops
-
- #     - name: Deploy ACM/GitOps Operands
- #       run: |
- #         cp ocp-artifact/auth/kubeconfig $GITHUB_WORKSPACE/kubeconfig
- #         export KUBECONFIG=$GITHUB_WORKSPACE/kubeconfig
-
-  #        oc apply -k gitops
+      - name: Deploy ACM/GitOps Operands
+        run: |
+          oc apply -k gitops --kubeconfig=GITHUB_WORKSPACE/kubeconfig
