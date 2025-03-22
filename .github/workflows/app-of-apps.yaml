@@ -17,7 +17,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
 
-     - name: Install OpenShift CLI tools
+      - name: Install OpenShift CLI tools
         uses: redhat-actions/openshift-tools-installer@v1
         with:
           openshift-install: "${{ secrets.OCP_CLIENT_VERSION }}"
