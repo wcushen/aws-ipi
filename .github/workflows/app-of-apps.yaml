@@ -1,10 +1,10 @@
-name: Deploy App of Apps
+name: ArgoCD App of Apps
 on:
   workflow_dispatch:
 
 jobs:
   Destroy:
-    name: Deploy App of Apps
+    name: ArgoCD App of Apps
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
