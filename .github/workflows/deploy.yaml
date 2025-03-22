@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@main
-      
+
       - name: Setup Working Directory for OCP Install
         run: |
           sed -i 's/RED_HAT_PULLSECRET/${{ secrets.RED_HAT_PULLSECRET }}/' install-config.yaml > /dev/null 2>&1
@@ -23,7 +23,17 @@ jobs:
         with:
           openshift-install: "${{secrets.OCP_CLIENT_VERSION}}"
           oc: "${{secrets.OCP_CLIENT_VERSION}}"
-      
+
+      - name: Create S3 Bucket for OCP Artifacts
+        run: |
+          BUCKET_NAME="OCPDEPLOY-$(date +%Y-%m-%d-%H-%M-%S)"
+          aws s3 mb s3://$BUCKET_NAME
+          echo "Created S3 bucket: $BUCKET_NAME"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+
       - name: Create OpenShift Cluster
         run: openshift-install create cluster --skip-password-print --dir=ocp-artifact/
         env:
@@ -33,7 +43,7 @@ jobs:
 
       - name: Upload Artifacts to S3
         run: |
-          aws s3 cp --recursive ocp-artifact/ s3://${{ secrets.AWS_S3_BUCKET }}/ocp-artifact/
+          aws s3 cp --recursive ocp-artifact/ s3://$BUCKET_NAME/ocp-artifact/
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
