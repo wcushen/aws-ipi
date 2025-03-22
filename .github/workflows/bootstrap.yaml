@@ -48,18 +48,6 @@ jobs:
             sleep 30
           done
 
-          echo "Waiting for CRDs to be available..."
-          for crd in gitopsclusters.apps.open-cluster-management.io \
-                     placements.cluster.open-cluster-management.io \
-                     managedclustersets.cluster.open-cluster-management.io \
-                     managedclustersetbindings.cluster.open-cluster-management.io \
-                     multiclusterhubs.operator.open-cluster-management.io; do
-            while ! oc get crd $crd &>/dev/null; do
-              echo "Waiting for CRD: $crd..."
-              sleep 10
-            done
-          done
-
           while true; do
             echo "Reapplying GitOps resources..."
             APPLY_OUTPUT=$(oc apply -k gitops --kubeconfig=$GITHUB_WORKSPACE/kubeconfig 2>&1)
