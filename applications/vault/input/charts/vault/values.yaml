@@ -1,7 +1,7 @@
 vault:
   enabled: true
   global:
-    tlsDisable: false
+    tlsDisable: true
     openshift: true
   injector:
     enabled: false
