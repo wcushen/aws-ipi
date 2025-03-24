@@ -1,6 +1,4 @@
 ---
-resources:
-- 
 
 helmCharts:
   - name: vault
@@ -14,6 +12,6 @@ helmCharts:
       vault:
         server:
           route:
-            host: vault.apps.cushen-demo.sandbox2233.opentlc.com
+            host: vault.apps.cushen-demo.sandbox511.opentlc.com
           extraEnvironmentVars:
-            VAULT_TLS_SERVER_NAME: vault.apps.cushen-demo.sandbox2233.opentlc.com
+            VAULT_TLS_SERVER_NAME: vault.apps.cushen-demo.sandbox511.opentlc.com
