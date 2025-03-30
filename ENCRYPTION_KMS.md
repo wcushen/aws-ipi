@@ -68,10 +68,8 @@ oc -n vault exec pods/vault-0  -- \
 
 The official ODF documentation recommends creating a `odf-vault-auth` service account in the `openshift-storage` namespace with an auth delegator role. This role allows Vault to authenticate against the OpenShift **TokenReview API** by using a long-lived service account token (`token_reviewer_jwt`).
 
-However, this time around we have decided against this approach for the following reasons:
-
-- Instead of introducing a dedicated SA for delegation, we bind the authentication role directly to the existing operator-managed service accounts.
-- The `odf-rook-ceph-op role` in Vault is bound to the `rook-ceph-system` SA. This SA is used by the Rook-Ceph operator when creating OSD encryption keys in Vault.
+- For this demo, instead of introducing a dedicated service account (SA) for delegation, we have bound the authentication role directly to the existing operator-managed service accounts. While keeping the token authentication process separate from the ODF operator’s service accounts is generally recommended in typical organizations for better access control flexibility, this adjustment simplifies our setup.
+- The `odf-rook-ceph-op` role in Vault is bound to the `rook-ceph-system` SA. This SA is used by the Rook-Ceph operator when creating OSD encryption keys in Vault.
 
 From v1.22, Kubernetes discourages the use of [long-lived SA tokens](https://kubernetes.io/docs/concepts/configuration/secret/#serviceaccount-token-secrets) and recommends using short-lived tokens via the TokenRequest API. We align with this best practice by setting a short TTL in the Vault role policy, ensuring tokens are automatically rotated on the Vault side.
 
@@ -142,9 +140,11 @@ On the next screen, we'll set our `LocalVolumeSet` and `StorageClass` name. The 
 
 ![StorageSystem - Screen 2](images/storagesystem-screen2.png)
 
-% oc get localvolumeset -A
+```sh
+$ oc get localvolumeset -A
 NAMESPACE                 NAME          AGE
 openshift-local-storage   local-block   3m7s
+```
 
 Once our localblock-backed PVs have been provisioned we can view the target hosts for the ODF cluster. For this demo, we will select a performance profile of **Lean**.
 
@@ -158,7 +158,7 @@ Provide the address of the Vault cluster. Since the deployment is within the clu
 
 ![StorageSystem - Screen 4](images/storagesystem-screen4.png)
 
-Go ahead and select *Advanced settings*. In line with our Vault settings we configured earlier, set the Backend and Authentication path to `odf` and `kubernetes`, respectively. Then upload the Root CA you used as the basis for your cert-manager (or other) backed Vault certs, this will create a secret in the `openshift-storage` namespace.
+Go ahead and select *Advanced settings*. In line with our Vault settings we configured earlier, set the Backend and Authentication path to `odf` and `kubernetes`, respectively. Then upload the Root CA that was used to issue your cert-manager (or other) issuer backed Vault certificates. This will generate a secret in the `openshift-storage` namespace.
 
 ![StorageSystem - Screen 5](images/storagesystem-screen5.png)
 
