@@ -15,7 +15,7 @@ While many enterprises use an **external Vault instance**, for demo purposes, we
 
 ### **1. Initialize Vault**
 
-Once Vault is running, initialize it:
+Once Vault is running, initialize it. You can either do these series of steps by executing each command with an `oc exec` wrapper or simply obtaining your tokens and running `oc exec -ti vault-0 -n vault -- sh` to run everything within the Vault shell.
 
 ```sh
 $ oc exec vault-0 -- vault operator init -key-shares=1 -key-threshold=1 -format=json > init-keys.json
@@ -55,7 +55,7 @@ identity_policies    []
 policies             ["root"]
 ```
 
-### **3. Configure Vault for Kubernetes Auth**
+### **2. Configure Vault for Kubernetes Auth and enable the KV backend path**
 
 ```sh
 oc -n vault exec pods/vault-0  -- \
@@ -76,7 +76,7 @@ The `odf-rook-ceph-op role` in Vault is bound to the `rook-ceph-system` SA. This
 
 From v1.22, Kubernetes discourages the use of [long-lived SA tokens](https://kubernetes.io/docs/concepts/configuration/secret/#serviceaccount-token-secrets) and recommends using short-lived tokens via the TokenRequest API. We align with this best practice by setting a short TTL in the Vault role policy, ensuring tokens are automatically rotated on the Vault side.
 
-### **4. Configure Vault Roles**
+### **3. Configure Vault Roles**
 
 ```sh
 oc -n vault exec pods/vault-0  -- \
@@ -104,27 +104,54 @@ oc -n vault exec pods/vault-0  -- \
     kubernetes_host="https://kubernetes.default.svc:443"
 ```
 
-### **4. Vault ACL Policies and Roles**
+### **5. Create an ACL Policy**
 
-#### **Create a Vault Policy for ODF**
 ```sh
-oc -n vault exec pods/vault-0  -- \
-    echo '
-    path "odf/*" {
-      capabilities = ["create", "read", "update", "delete", "list"]
-    }
-    path "sys/mounts" {
-    capabilities = ["read"]
-    }'| vault policy write odf -
+oc -n vault exec -i pods/vault-0 -- vault policy write odf - <<EOF
+path "odf/*" {
+  capabilities = ["create", "read", "update", "delete", "list"]
+}
+path "sys/mounts" {
+  capabilities = ["read"]
+}
+EOF
 ```
 
-## **Deploy ODF StorageSystem with KMS Cluster-Wide Encryption**
+## **Deploying ODF StorageSystem with KMS Cluster-Wide Encryption**
 
-Get to the stage where you've installed both the Local Storage Operator and the OpenShift Data Foundation Operator.
+Now with Vault all configured, we're ready to head over to the OpenShift console and step through the ODF wizard to get our storage cluster up.
+
+Get to the stage where you've installed both the Local Storage Operator (LSO) and the OpenShift Data Foundation Operator via Operator Hub.
 
 ### **1. Create a KMS Connection Secret**
 
-ODF requires a **KMS connection configmap** in the `openshift-storage` namespace. Create it with:
+With the Operators deployed, select `Create StorageSystem` in figure below to get to the ODF configuration screen.
+
+![Create StorageSystem](images/installedodf-createss.png)
+
+You will then be presented with the `StorageSystem` wizard. By opting for local devices, the LSO will kick off a discovery of our drives.
+
+![StorageSystem - Screen 1](images/storagesystem-screen1.png)
+
+On the next screen, we'll set our `LocalVolumeSet` and `StorageClass` name. The selected capacity confirmed that all our disks have been picked up correctly. Hit **Confirm** to create the LVS.
+
+![StorageSystem - Screen 2](images/storagesystem-screen2.png)
+
+% oc get localvolumeset -A
+NAMESPACE                 NAME          AGE
+openshift-local-storage   local-block   3m7s
+
+Once our localblock-backed PVs have been provisioned we can view the target hosts for the ODF cluster. For this demo, we will select a performance profile of **Lean**.
+
+![StorageSystem - Screen 3](images/storagesystem-screen3.png)
+
+In this screen, we'll set up everything we need for KMS integration with Vault. 
+
+By default, Kubernetes is used as the authentication method. Enter a **Connection name** — "odf" is a suitable choice, as we're configuring this specifically for ODF.
+
+Provide the address of the Vault cluster. Since the deployment is within the cluster, you can use the Service address along with the default Vault Port, 8200.
+
+![StorageSystem - Screen 4](images/storagesystem-screen4.png)
 
 ```yaml
 kind: ConfigMap
