@@ -66,13 +66,12 @@ oc -n vault exec pods/vault-0  -- \
 ```
 ## A note on ODF Vault roles 
 
-The official ODF documentation recommends creating a odf-vault-auth service account in the openshift-storage namespace with an auth delegator role. This role allows Vault to authenticate against the OpenShift TokenReview API by using a long-lived service account token (token_reviewer_jwt).
+The official ODF documentation recommends creating a `odf-vault-auth` service account in the `openshift-storage` namespace with an auth delegator role. This role allows Vault to authenticate against the OpenShift **TokenReview API** by using a long-lived service account token (`token_reviewer_jwt`).
 
 However, this time around we have decided against this approach for the following reasons:
 
-Instead of introducing a dedicated SA for delegation, we bind the authentication role directly to the existing operator-managed service accounts.
-
-The `odf-rook-ceph-op role` in Vault is bound to the `rook-ceph-system` SA. This SA is used by the Rook-Ceph operator when creating OSD encryption keys in Vault.
+- Instead of introducing a dedicated SA for delegation, we bind the authentication role directly to the existing operator-managed service accounts.
+- The `odf-rook-ceph-op role` in Vault is bound to the `rook-ceph-system` SA. This SA is used by the Rook-Ceph operator when creating OSD encryption keys in Vault.
 
 From v1.22, Kubernetes discourages the use of [long-lived SA tokens](https://kubernetes.io/docs/concepts/configuration/secret/#serviceaccount-token-secrets) and recommends using short-lived tokens via the TokenRequest API. We align with this best practice by setting a short TTL in the Vault role policy, ensuring tokens are automatically rotated on the Vault side.
 
@@ -117,13 +116,19 @@ path "sys/mounts" {
 EOF
 ```
 
-## **Deploying ODF StorageSystem with KMS Cluster-Wide Encryption**
+## **Deploying ODF Storage Cluster with KMS Cluster-Wide Encryption**
 
 Now with Vault all configured, we're ready to head over to the OpenShift console and step through the ODF wizard to get our storage cluster up.
 
 Get to the stage where you've installed both the Local Storage Operator (LSO) and the OpenShift Data Foundation Operator via Operator Hub.
 
-### **1. Create a KMS Connection Secret**
+### **1. Create the auth-delegator `ClusterRoleBinding`**
+
+```sh
+oc -n openshift-storage create clusterrolebinding vault-tokenreview-binding --clusterrole=system:auth-delegator --serviceaccount=openshift-storage:rook-ceph-system
+```
+
+### **2. Create the ODF StorageSystem**
 
 With the Operators deployed, select `Create StorageSystem` in figure below to get to the ODF configuration screen.
 
@@ -153,6 +158,18 @@ Provide the address of the Vault cluster. Since the deployment is within the clu
 
 ![StorageSystem - Screen 4](images/storagesystem-screen4.png)
 
+Go ahead and select *Advanced settings*. In line with our Vault settings we configured earlier, set the Backend and Authentication path to `odf` and `kubernetes`, respectively. Then upload the Root CA you used as the basis for your cert-manager (or other) backed Vault certs, this will create a secret in the `openshift-storage` namespace.
+
+![StorageSystem - Screen 5](images/storagesystem-screen5.png)
+
+Under *Review and create*, select `Create StorageSystem`.
+
+![StorageSystem - Screen 6](images/storagesystem-screen6.png)
+
+The OCS Operator should spawn a `csi-kms-ca-secret-<hash>` and `ocs-kms-ca-secret-<hash>` K8s secret (if it doesn't immediately, delete the pod and let it recreate). Additionally, two key ConfigMaps containing the KMS connection details should also be present in the `openshift-storage` namespace. Inspect their contents to verify all the relevant data you inputted via the ODF console is all there. 
+
+They should resemble something like the below:
+
 ```yaml
 kind: ConfigMap
 apiVersion: v1
@@ -160,7 +177,7 @@ metadata:
   name: csi-kms-connection-details
   namespace: openshift-storage
 data:
-  odf: '{"encryptionKMSType":"vaulttenantsa","vaultBackend":"kv-v2","kmsServiceName":"odf","vaultAddress":"https://vault.apps.cushen-demo.sandbox763.opentlc.com:443","vaultBackendPath":"odf","vaultCAFromSecret":"csi-kms-ca-secret-govhe5h8","vaultCAFileName":"my-root-ca.pem","vaultAuthMethod":"kubernetes","vaultAuthPath":"kubernetes","vaultAuthNamespace":"","vaultNamespace":""}'
+  odf: '{"encryptionKMSType":"vaulttenantsa","kmsServiceName":"odf","vaultAddress":"https://vault.vault.svc:8200","vaultBackendPath":"odf","vaultCAFromSecret":"csi-kms-ca-secret-yai05r68","vaultTLSServerName":"","vaultCAFileName":"my-root-ca.pem","vaultClientCertFileName":"","vaultClientCertKeyFileName":"","vaultAuthMethod":"kubernetes","vaultAuthPath":"kubernetes","vaultAuthNamespace":"","vaultNamespace":""}'
 ```
 
 ```yaml
@@ -172,28 +189,52 @@ metadata:
 data:
   KMS_SERVICE_NAME: odf
   VAULT_AUTH_KUBERNETES_ROLE: odf-rook-ceph-op
-  VAULT_BACKEND: kv-v2
   VAULT_AUTH_METHOD: kubernetes
   VAULT_NAMESPACE: ''
-  VAULT_CACERT: ocs-kms-ca-secret-u3e3ychq
+  VAULT_CACERT: ocs-kms-ca-secret-pzm5nwjd
   VAULT_AUTH_MOUNT_PATH: kubernetes
   VAULT_TLS_SERVER_NAME: ''
   VAULT_BACKEND_PATH: odf
-  VAULT_ADDR: 'https://vault.apps.cushen-demo.sandbox763.opentlc.com:443'
+  VAULT_ADDR: 'https://vault.vault.svc:8200'
   KMS_PROVIDER: vault
 ```
 
-### **3. Restart ODF Components**
-
-After updating the ConfigMaps, restart ODF components to apply changes:
+You can tail the logs of the rook-ceph operator pod to check for any errors. However, the ultimate test is to verify that the encryption keys have been created in the backend path in Vault.
 
 ```sh
-oc delete pod -n openshift-storage --selector=app=rook-ceph-operator
+$ oc -n vault exec vault-0 -- vault kv list odf
+Keys
+----
+rook-ceph-osd-encryption-key-ocs-deviceset-localblock-0-data-0xlflh
+rook-ceph-osd-encryption-key-ocs-deviceset-localblock-1-data-0vzjf7
+rook-ceph-osd-encryption-key-ocs-deviceset-localblock-2-data-0xc84g
 ```
 
-Verify encryption is enabled:
+Or in the Vault console.
+
+![Vault OSD Keys](images/vault-rook-ceph-osd.png)
+
+With these present in Vault, you should now see the OSD pods come up.
+
 ```sh
-oc get cephcluster -n openshift-storage -o yaml | grep -i encryption
+$ oc get pod -l app=rook-ceph-osd
+NAME                               READY   STATUS    RESTARTS   AGE
+rook-ceph-osd-0-84755dcfbc-jsfhk   2/2     Running   0          92s
+rook-ceph-osd-1-bb58bf7f6-qzsb4    2/2     Running   0          90s
+rook-ceph-osd-2-54d85d8b55-kz6hd   2/2     Running   0          84s
+```
+
+And there we have it. The ODF cluster is complete and ready for use, with the following storage classes available for PV consumption on the cluster.
+
+```sh
+$ oc get sc
+NAME                                    PROVISIONER                             RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
+gp2-csi                                 ebs.csi.aws.com                         Delete          WaitForFirstConsumer   true                   7h2m
+gp3-csi (default)                       ebs.csi.aws.com                         Delete          WaitForFirstConsumer   true                   7h2m
+localblock                              kubernetes.io/no-provisioner            Delete          WaitForFirstConsumer   false                  34m
+ocs-storagecluster-ceph-rbd (default)   openshift-storage.rbd.csi.ceph.com      Delete          Immediate              true                   7m26s
+ocs-storagecluster-cephfs               openshift-storage.cephfs.csi.ceph.com   Delete          Immediate              true                   7m56s
+openshift-storage.noobaa.io             openshift-storage.noobaa.io/obc         Delete          Immediate              false                  4m39s
 ```
 
 ---
@@ -202,4 +243,4 @@ oc get cephcluster -n openshift-storage -o yaml | grep -i encryption
 
 Integrating ODF with HashiCorp Vault gives you a secure, centralized way to manage encryption for your data at rest. Whether you're using Vault as your KMS or looking to enhance security with HSM-backed key storage, there's a lot of flexibility in how you approach the setup. Vault’s policies also allow for fine-grained access control, ensuring that only the right services can access your sensitive data - we can imagine a world in which certain industries require this more than others. 
 
-This guide covers the basics, but the true value of this setup lies in its flexibility to adapt to your organization's specific needs. ODF Encryption doesn’t stop at cluster-wide encryption for OSDs; you can also configure what I would loosely reference as "double encryption". This involves encrypting not only the cluster-wide storage but also individual StorageClass-level encryption, where PVs are encrypted at the namespace level, really locking things down. 
+This guide covers the basics, but the true value of this setup lies in its flexibility to adapt to your organization's specific needs. ODF Encryption doesn’t stop at cluster-wide encryption for OSDs; you can also configure what I would loosely reference as "double encryption". This involves encrypting not only the cluster-wide storage but also individual StorageClass-level encryption, where PVs are encrypted at-rest, at the namespace level, really locking things down. 
