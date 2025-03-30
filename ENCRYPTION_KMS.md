@@ -2,7 +2,7 @@
 
 ## **Introduction**
 
-Managing secrets securely is becoming increasingly a non-neogtiable for many enterprises today across cloud and on-prem environments. With IBM’s recent acquisition of HashiCorp, organizations are now poised to take advantage of deeper integration opportunities between HashiCorp Vault and Red Hat OpenShift, strengthening their security posture.
+Managing secrets securely is becoming increasingly a non-negotiable for many enterprises today across cloud and on-prem environments. With IBM’s recent acquisition of HashiCorp, organizations are now poised to take advantage of deeper integration opportunities between HashiCorp Vault and Red Hat OpenShift, strengthening their security posture.
 
 In this article, we’ll walk through the integration of OpenShift Data Foundation (ODF) with HashiCorp Vault to enable cluster-wide encryption using Vault as a Key Management System (KMS). This demo will be deployed on AWS using local devices as the backing store to the ODF cluster.
 
@@ -10,99 +10,113 @@ In this article, we’ll walk through the integration of OpenShift Data Foundati
 
 While many enterprises use an **external Vault instance**, for demo purposes, we will deploy Vault **within the OpenShift cluster** using Helm. The Vault instance will:
 
-- Be deployed via **Helm**.
-- Use TLS certificates managed by **cert-manager** (not covered here).
-- Be initialized with a **root CA generated locally**
+- Be deployed via **Helm** with TLS certificates managed by **cert-manager** ([here](https://cert-manager.io/docs/configuration/vault/) is a great guide to walk you through that).
+- The TLS certs will be created with a **locally generated root CA**
 
-### **1. Deploy Vault with Helm**
-
-First, add the HashiCorp Helm repository and install Vault:
-
-```sh
-helm repo add hashicorp https://helm.releases.hashicorp.com
-helm repo update
-
-helm install vault hashicorp/vault --namespace vault --create-namespace \
-  --set server.dev.enabled=true
-```
-
-### **2. Initialize Vault**
+### **1. Initialize Vault**
 
 Once Vault is running, initialize it:
 
 ```sh
-vault operator init
+$ oc exec vault-0 -- vault operator init -key-shares=1 -key-threshold=1 -format=json > init-keys.json
 ```
 This command generates **unseal keys** and a **root token**. Make sure to store them securely. You'll often be prompted to unseal Vault.
 
 Unseal Vault with:
 ```sh
-vault operator unseal
+$ cat init-keys.json | jq -r ".unseal_keys_b64[]"
+hmeMLoRiX/trBTx/xPZHjCcZ7c4H8OCt2Njkrv2yXZY=
+```
+```sh
+$ VAULT_UNSEAL_KEY=$(cat init-keys.json | jq -r ".unseal_keys_b64[]")
+$ oc exec vault-0 -- vault operator unseal $VAULT_UNSEAL_KEY
+```
+```sh
+$ cat init-keys.json | jq -r ".root_token"
+s.XzExf8TjRVYKm85xMATa6Q7U
+$ VAULT_ROOT_TOKEN=$(cat init-keys.json | jq -r ".root_token")
 ```
 
-### **3. Enable Kubernetes Authentication**
-
 ```sh
-vault auth enable kubernetes
+oc exec vault-0 -- vault login $VAULT_ROOT_TOKEN
+
+Success! You are now authenticated. The token information displayed below
+is already stored in the token helper. You do NOT need to run "vault login"
+again. Future Vault requests will automatically use this token.
+
+Key                  Value
+---                  -----
+token                s.P3Koh6BZikQPDxPSNwDzmKJ5
+token_accessor       kHFYypyS2EcYpMyrsyXUQmNa
+token_duration       ∞
+token_renewable      false
+token_policies       ["root"]
+identity_policies    []
+policies             ["root"]
 ```
 
-### **4. Enable the backend path in Vault (assuming v2)**
+### **3. Configure Vault for Kubernetes Auth**
 
 ```sh
-vault secrets enable -path=odf kv-v2
+oc -n vault exec pods/vault-0  -- \
+        vault auth enable kubernetes
+
+oc -n vault exec pods/vault-0  -- \
+        vault secrets enable -path=odf kv-v2
+```
+## A note on ODF Vault roles 
+
+The official ODF documentation recommends creating a odf-vault-auth service account in the openshift-storage namespace with an auth delegator role. This role allows Vault to authenticate against the OpenShift TokenReview API by using a long-lived service account token (token_reviewer_jwt).
+
+However, this time around we have decided against this approach for the following reasons:
+
+Instead of introducing a dedicated SA for delegation, we bind the authentication role directly to the existing operator-managed service accounts.
+
+The `odf-rook-ceph-op role` in Vault is bound to the `rook-ceph-system` SA. This SA is used by the Rook-Ceph operator when creating OSD encryption keys in Vault.
+
+From v1.22, Kubernetes discourages the use of [long-lived SA tokens](https://kubernetes.io/docs/concepts/configuration/secret/#serviceaccount-token-secrets) and recommends using short-lived tokens via the TokenRequest API. We align with this best practice by setting a short TTL in the Vault role policy, ensuring tokens are automatically rotated on the Vault side.
+
+### **4. Configure Vault Roles**
+
+```sh
+oc -n vault exec pods/vault-0  -- \
+        vault write auth/kubernetes/role/odf-rook-ceph-op \
+        bound_service_account_names=rook-ceph-system,rook-ceph-osd,noobaa \
+        bound_service_account_namespaces=openshift-storage \
+        policies=odf \
+        ttl=5m
+
+oc -n vault exec pods/vault-0 -- \
+        vault write auth/kubernetes/role/odf-rook-ceph-osd \
+        bound_service_account_names=rook-ceph-osd \
+        bound_service_account_namespaces=openshift-storage \
+        policies=odf \
+        ttl=5m
 ```
 
-Set up the authentication configuration:
+### **4. Configure the K8s authentication method to use location of the Kubernetes API**
 
-Note: Part of the following command is used to obtain the OCP CA certificate for Vault, specifically when the OpenShift cluster is using a self-signed API certificate, and we only need the Root CA.
+Note: If Vault is hosted on kubernetes, `kubernetes_ca_cert` can be omitted from the config of a Kubernetes Auth mount. 
 
 ```sh
-vault write auth/kubernetes/config \
-    kubernetes_host="$(oc config view --minify --flatten -o jsonpath="{.clusters[0].cluster.server})" \
-    kubernetes_ca_cert="$(openssl s_client -connect api.cushen-demo.sandbox763.opentlc.com:6443 -showcerts </dev/null 2>/dev/null | awk 'BEGIN {c=0} /-----BEGIN CERTIFICATE-----/ {c++} c==2 && NF {print} /-----END CERTIFICATE-----/ {if (c==2) exit}')"
-``````
+oc -n vault exec pods/vault-0  -- \
+    vault write auth/kubernetes/config \
+    kubernetes_host="https://kubernetes.default.svc:443"
+```
 
 ### **4. Vault ACL Policies and Roles**
 
 #### **Create a Vault Policy for ODF**
 ```sh
-echo '
-path "odf/*" {
-  capabilities = ["create", "read", "update", "delete", "list"]
-}
-path "sys/mounts" {
-capabilities = ["read"]
-}'| vault policy write odf -
+oc -n vault exec pods/vault-0  -- \
+    echo '
+    path "odf/*" {
+      capabilities = ["create", "read", "update", "delete", "list"]
+    }
+    path "sys/mounts" {
+    capabilities = ["read"]
+    }'| vault policy write odf -
 ```
-
-## ODF Vault roles 
-
-The official ODF documentation suggests creating a dedicated `odf-vault-auth` service account in the `openshift-storage` namespace, which is assigned an auth delegator role. The auth delegator role in Vault is responsible for authenticating against the OpenShift TokenReview API. It allows Vault to verify the validity of the service account's token - so effectively, it's acting as a bridge between OpenShift's token system and Vault.
-
-Why would we want to do this?
-
-- Keeps the auth process separate from the ODF operator's service accounts, so we can manage access control independently.
-- We can manage Vault authentication independently of the lifecycle of ODF operator components
-
-However, for this demo, we've chosen to eliminate this redundancy. Instead of using a dedicated SA for Vault authentication, we've directly bound the **auth-delegator** role to the service account used by the ODF operator pods (`rook-ceph-system`). The `odf-rook-ceph-op` role in Vault is linked to this SA, which manages the creation of OSD keys in Vault, simplifying the configuration in our setup.
-
-#### **Create a Role for ODF Storage**
-```sh
-vault write auth/kubernetes/role/odf-rook-ceph-op \
-bound_service_account_names=rook-ceph-system,rook-ceph-osd,noobaa \
-bound_service_account_namespaces=openshift-storage \
-policies=odf \
-ttl=1440h
-```
-
-```sh
-vault write auth/kubernetes/role/odf-rook-ceph-osd \
-bound_service_account_names=rook-ceph-osd \
-bound_service_account_namespaces=openshift-storage \
-policies=odf \
-ttl=1440h
-```
----
 
 ## **Deploy ODF StorageSystem with KMS Cluster-Wide Encryption**
 
