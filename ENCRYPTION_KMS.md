@@ -204,6 +204,8 @@ You can tail the logs of the rook-ceph operator pod to check for any errors. How
 There's every chance that you will encounter the following error. It just means that Vault is in need of being unsealed again.
 
 ```bash
+$ oc logs -f rook-ceph-operator-65d9d759c9-6g4s5
+...
 URL: PUT https://vault.vault.svc:8200/v1/auth/kubernetes/login
 Code: 503. Errors:
 
