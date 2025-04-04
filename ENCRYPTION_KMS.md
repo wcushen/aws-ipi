@@ -120,7 +120,7 @@ Now with Vault all configured, we're ready to head over to the OpenShift console
 
 Get to the stage where you've installed both the Local Storage Operator (LSO) and the OpenShift Data Foundation Operator via Operator Hub.
 
-### **1. Create the auth-delegator `ClusterRoleBinding`**
+### **1. Create the auth-delegator `ClusterRoleBinding`** !!! ODDLY NOT REQUIRED !!!
 
 ```sh
 oc -n openshift-storage create clusterrolebinding vault-tokenreview-binding --clusterrole=system:auth-delegator --serviceaccount=openshift-storage:rook-ceph-system
