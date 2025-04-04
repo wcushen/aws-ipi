@@ -15,10 +15,10 @@ While many enterprises use an **external Vault instance**, for demo purposes, we
 
 ### **1. Initialize Vault**
 
-Once Vault is running, initialize it. You can either do these series of steps by executing each command with an `oc exec` wrapper or simply obtaining your tokens and running `oc exec -ti vault-0 -n vault -- sh` to run everything within the Vault shell.
+Once Vault is running, initialize it. You can either do these series of steps by executing each command with an `oc exec` wrapper or simply obtaining your tokens and running `oc exec -n vault -ti vault-0 -n vault -- sh` to run everything within the Vault shell.
 
 ```sh
-$ oc exec vault-0 -- vault operator init -key-shares=1 -key-threshold=1 -format=json > init-keys.json
+$ oc exec -n vault vault-0 -- vault operator init -key-shares=1 -key-threshold=1 -format=json > init-keys.json
 ```
 This command generates **unseal keys** and a **root token**. Make sure to store them securely. You'll often be prompted to unseal Vault.
 
@@ -29,7 +29,7 @@ hmeMLoRiX/trBTx/xPZHjCcZ7c4H8OCt2Njkrv2yXZY=
 ```
 ```sh
 $ VAULT_UNSEAL_KEY=$(cat init-keys.json | jq -r ".unseal_keys_b64[]")
-$ oc exec vault-0 -- vault operator unseal $VAULT_UNSEAL_KEY
+$ oc exec -n vault vault-0 -- vault operator unseal $VAULT_UNSEAL_KEY
 ```
 ```sh
 $ cat init-keys.json | jq -r ".root_token"
@@ -38,7 +38,7 @@ $ VAULT_ROOT_TOKEN=$(cat init-keys.json | jq -r ".root_token")
 ```
 
 ```sh
-oc exec vault-0 -- vault login $VAULT_ROOT_TOKEN
+oc exec -n vault vault-0 -- vault login $VAULT_ROOT_TOKEN
 
 Success! You are now authenticated. The token information displayed below
 is already stored in the token helper. You do NOT need to run "vault login"
@@ -71,7 +71,7 @@ The official ODF documentation recommends creating a `odf-vault-auth` service ac
 - For this demo, instead of introducing a dedicated service account (SA) for delegation, we have bound the authentication role directly to the existing operator-managed service accounts. While keeping the token authentication process separate from the ODF operator’s service accounts is generally recommended in typical organizations for better access control flexibility, this adjustment simplifies our setup.
 - The `odf-rook-ceph-op` role in Vault is bound to the `rook-ceph-system` SA. This SA is used by the Rook-Ceph operator when creating OSD encryption keys in Vault.
 
-From v1.22, Kubernetes discourages the use of [long-lived SA tokens](https://kubernetes.io/docs/concepts/configuration/secret/#serviceaccount-token-secrets) and recommends using short-lived tokens via the TokenRequest API. We align with this best practice by setting a short TTL in the Vault role policy, ensuring tokens are automatically rotated on the Vault side.
+From v1.22, Kubernetes *discourages* the use of [long-lived SA tokens](https://kubernetes.io/docs/concepts/configuration/secret/#serviceaccount-token-secrets) and recommends using short-lived tokens via the TokenRequest API. We align with this best practice by setting a short TTL in the Vault role policy, ensuring tokens are automatically rotated on the Vault side.
 
 ### **3. Configure Vault Roles**
 
@@ -93,7 +93,7 @@ oc -n vault exec pods/vault-0 -- \
 
 ### **4. Configure the K8s authentication method to use location of the Kubernetes API**
 
-Note: If Vault is hosted on kubernetes, `kubernetes_ca_cert` can be omitted from the config of a Kubernetes Auth mount. 
+**Note:** If Vault is hosted on kubernetes, `kubernetes_ca_cert` can be omitted from the config of a Kubernetes Auth mount. 
 
 ```sh
 oc -n vault exec pods/vault-0  -- \
@@ -158,7 +158,7 @@ Provide the address of the Vault cluster. Since the deployment is within the clu
 
 ![StorageSystem - Screen 4](images/storagesystem-screen4.png)
 
-Go ahead and select *Advanced settings*. In line with our Vault settings we configured earlier, set the Backend and Authentication path to `odf` and `kubernetes`, respectively. Then upload the Root CA that was used to issue your cert-manager (or other) issuer backed Vault certificates. This will generate a secret in the `openshift-storage` namespace.
+Go ahead and select *Advanced settings*. In line with our Vault settings we configured earlier, set the Backend and Authentication path to `odf` and `kubernetes`, respectively. Then upload the Root CA that was used to issue your cert-manager (or other) issuer-backed Vault certificates. This will generate a secret in the `openshift-storage` namespace.
 
 ![StorageSystem - Screen 5](images/storagesystem-screen5.png)
 
@@ -200,6 +200,17 @@ data:
 ```
 
 You can tail the logs of the rook-ceph operator pod to check for any errors. However, the ultimate test is to verify that the encryption keys have been created in the backend path in Vault.
+
+There's every chance that you will encounter the following error. It just means that Vault is in need of being unsealed again.
+
+```bash
+URL: PUT https://vault.vault.svc:8200/v1/auth/kubernetes/login
+Code: 503. Errors:
+
+* Vault is sealed
+```
+
+Simply re-run, `oc exec -n vault vault-0 -- vault operator unseal $VAULT_UNSEAL_KEY`
 
 ```sh
 $ oc -n vault exec vault-0 -- vault kv list odf
