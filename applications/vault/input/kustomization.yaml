@@ -12,6 +12,6 @@ helmCharts:
       vault:
         server:
           route:
-            host: vault.apps.cushen-demo.sandbox385.opentlc.com
+            host: vault.apps.cushen-demo.sandbox3159.opentlc.com
           extraEnvironmentVars:
-            VAULT_TLS_SERVER_NAME: vault.apps.cushen-demo.sandbox385.opentlc.com
+            VAULT_TLS_SERVER_NAME: vault.apps.cushen-demo.sandbox3159.opentlc.com
