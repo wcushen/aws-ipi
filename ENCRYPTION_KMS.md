@@ -2,7 +2,7 @@
 
 ## **Introduction**
 
-Managing secrets securely is becoming increasingly a non-negotiable for many enterprises today across cloud and on-prem environments. With IBM’s recent acquisition of HashiCorp, organizations are now poised to take advantage of deeper integration opportunities between HashiCorp Vault and Red Hat OpenShift, strengthening their security posture.
+Managing secrets securely is becoming increasingly a non-negotiable for many enterprises today across cloud and on-prem environments. With IBM’s recent acquisition of HashiCorp, organizations are now poised to take advantage of deeper integration opportunities between HashiCorp Vault and Red Hat OpenShift, all in a bid to strengthen their security posture.
 
 In this article, we’ll walk through the integration of OpenShift Data Foundation (ODF) with HashiCorp Vault to enable cluster-wide encryption using Vault as a Key Management System (KMS). This demo will be deployed on AWS using local devices as the backing store to the ODF cluster.
 
@@ -120,13 +120,22 @@ Now with Vault all configured, we're ready to head over to the OpenShift console
 
 Get to the stage where you've installed both the Local Storage Operator (LSO) and the OpenShift Data Foundation Operator via Operator Hub.
 
-### **1. Create the auth-delegator `ClusterRoleBinding`** !!! ODDLY NOT REQUIRED !!!
+Typically, when calling a Vault instance **external to the cluster**, we're required to explicitly *delegate authentication* decisions to the Kubernetes API Server. Relevant to our scenario, would be when Vault is set up to authenticate Kubernetes services account via the `kubernetes` auth method in Vault. 
+
+When deployed internally, the ODF-Vault token handshake looks a little different.
+
+1. ODF/Rook passes its service account token (automatically mounted in the pod) to Vault.
+2. Vault is responsible for verifying that token with the Kubernetes API.
+3. Vault’s own service account has the permission to do TokenReview (observed by the output below)
 
 ```sh
-oc -n openshift-storage create clusterrolebinding vault-tokenreview-binding --clusterrole=system:auth-delegator --serviceaccount=openshift-storage:rook-ceph-system
+$ oc adm policy who-can create tokenreviews.authentication.k8s.io | grep vault
+        system:serviceaccount:vault:vault
 ```
 
-### **2. Create the ODF StorageSystem**
+In short, explicitly defining an `auth-delegator` RoleBinding is not required here.
+
+## **Create the ODF StorageSystem**
 
 With the Operators deployed, select `Create StorageSystem` in figure below to get to the ODF configuration screen.
 
