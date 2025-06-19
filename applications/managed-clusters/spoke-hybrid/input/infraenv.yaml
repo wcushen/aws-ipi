@@ -1,0 +1,19 @@
+apiVersion: agent-install.openshift.io/v1beta1
+kind: InfraEnv
+metadata:
+  name: hosted
+spec:
+  agentLabels:
+    agentBareMetal-generated-infraenv-ai-flow: hosted-hosted
+  clusterRef:
+    name: hosted
+    namespace: hosted
+  cpuArchitecture: x86_64
+  imageType: full-iso
+  ipxeScriptType: DiscoveryImageAlways
+  nmStateConfigLabelSelector:
+   matchLabels:
+     nmstate_config_cluster_name: $CHANGE_SPOKE_NAME
+  pullSecretRef:
+    name: pullsecret-cluster-hosted
+  sshAuthorizedKey: <ssh>

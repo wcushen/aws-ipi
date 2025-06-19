@@ -1,0 +1,21 @@
+apiVersion: extensions.hive.openshift.io/v1beta1
+kind: AgentClusterInstall
+metadata:
+  name: hosted
+  namespace: hosted
+spec:
+  clusterDeploymentRef:
+    name: hosted
+  holdInstallation: true
+  imageSetRef:
+    name: img4.18.17-multi-appsub
+  networking:
+    clusterNetwork:
+      - cidr: 10.128.0.0/14
+        hostPrefix: 23
+    networkType: OVNKubernetes
+    serviceNetwork:
+      - 172.30.0.0/16
+    userManagedNetworking: false
+  provisionRequirements:
+    controlPlaneAgents: 3

@@ -1,0 +1,10 @@
+---
+resources:
+  - namespace.yaml
+  - pull-secret.yaml
+  - agentclusterinstall.yaml
+  - infraenv.yaml
+  - clusterdeployment.yaml
+  - managedcluster.yaml
+  - nmstateconfig.yaml
+  - klusterletaddonconfig.yaml

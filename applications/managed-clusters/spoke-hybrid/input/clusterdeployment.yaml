@@ -1,0 +1,26 @@
+apiVersion: hive.openshift.io/v1
+kind: ClusterDeployment
+metadata:
+  name: hosted
+  namespace: hosted
+  labels:
+    cluster.open-cluster-management.io/clusterset: default
+    hive.openshift.io/cluster-platform: agent-baremetal
+spec:
+  baseDomain: redhatlabs.dev
+  clusterInstallRef:
+    group: extensions.hive.openshift.io
+    kind: AgentClusterInstall
+    name: hosted
+    version: v1beta1
+  clusterName: hosted
+  controlPlaneConfig:
+    servingCertificates: {}
+  installed: false
+  platform:
+    agentBareMetal:
+      agentSelector:
+        matchLabels:
+          agentBareMetal-generated-infraenv-ai-flow: hosted-hosted
+  pullSecretRef:
+    name: pullsecret-cluster-hosted
