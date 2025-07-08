@@ -3,6 +3,7 @@ resources:
   - namespace.yaml
   - pull-secret.yaml
   - agentclusterinstall.yaml
+  - agentserviceconfig.yaml
   - infraenv.yaml
   - clusterdeployment.yaml
   - managedcluster.yaml
