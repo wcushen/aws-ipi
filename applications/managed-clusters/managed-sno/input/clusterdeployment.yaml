@@ -5,9 +5,9 @@ metadata:
   namespace: hosted
   labels:
     cluster.open-cluster-management.io/clusterset: default
-    hive.openshift.io/cluster-platform: agent-baremetal
+    hive.openshift.io/cluster-platform: none-platform
 spec:
-  baseDomain: redhatlabs.dev
+  baseDomain: sno.redhatlabs.dev
   clusterInstallRef:
     group: extensions.hive.openshift.io
     kind: AgentClusterInstall
@@ -18,9 +18,6 @@ spec:
     servingCertificates: {}
   installed: false
   platform:
-    agentBareMetal:
-      agentSelector:
-        matchLabels:
-          agentBareMetal-generated-infraenv-ai-flow: hosted-hosted
+    none: {}
   pullSecretRef:
     name: pullsecret-cluster-hosted

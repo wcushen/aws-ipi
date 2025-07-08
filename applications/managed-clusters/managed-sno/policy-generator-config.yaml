@@ -2,9 +2,9 @@
 apiVersion: policy.open-cluster-management.io/v1
 kind: PolicyGenerator
 metadata:
-  name: spoke-hybrid
+  name: managed-sno
 placementBindingDefaults:
-  name: spoke-hybrid
+  name: managed-sno
 policyDefaults:
   placement:
     placementName: placement-hub-openshift
@@ -24,6 +24,6 @@ policyDefaults:
     - NIST SP 800-53
   policyAnnotations: {"argocd.argoproj.io/compare-options": "IgnoreExtraneous"}
 policies:
-  - name: hcp-1
+  - name: managed-sno
     manifests:
       - path: input/

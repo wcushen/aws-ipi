@@ -6,16 +6,19 @@ metadata:
 spec:
   clusterDeploymentRef:
     name: hosted
-  holdInstallation: true
   imageSetRef:
-    name: img4.18.17-multi-appsub
+    name: img4.19.0-multi-appsub
   networking:
     clusterNetwork:
       - cidr: 10.128.0.0/14
         hostPrefix: 23
+    machineNetwork:
+      - cidr: 192.168.130.0/24
     networkType: OVNKubernetes
     serviceNetwork:
       - 172.30.0.0/16
-    userManagedNetworking: false
+    userManagedNetworking: true
   provisionRequirements:
-    controlPlaneAgents: 3
+    controlPlaneAgents: 1
+  platformType: None
+  sshPublicKey: <ssh_key>
